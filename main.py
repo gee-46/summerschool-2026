@@ -168,6 +168,13 @@ def response_agent(result: dict, prompt: str) -> dict:
         "processed_output": processed_output
     }
 
+def explanation_agent(result: dict) -> dict:
+    logger.info("EXPLANATION AGENT → generating reasoning")
+    return {
+        "simple": result["reason"]["simple"],
+        "technical": result["reason"]["technical"]
+    }
+
 @app.post("/analyze", response_model=AnalyzeResponse)
 async def analyze_prompt(request: AnalyzeRequest):
     logger.info(f"Incoming prompt scanner request: {repr(request.prompt)}")
@@ -175,12 +182,14 @@ async def analyze_prompt(request: AnalyzeRequest):
     response_data = response_agent(result, request.prompt)
     logger.info(f"RESPONSE AGENT → action: {response_data['action']}")
     
+    explanation = explanation_agent(result)
+    
     return AnalyzeResponse(
         risk=result["risk"],
         label=result["label"],
         reason=ReasonDetail(
-            simple=result["reason"]["simple"],
-            technical=result["reason"]["technical"]
+            simple=explanation["simple"],
+            technical=explanation["technical"]
         ),
         action=response_data["action"],
         processed_output=response_data["processed_output"]
