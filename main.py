@@ -55,6 +55,8 @@ class AnalyzeResponse(BaseModel):
     risk: int = Field(..., ge=0, le=100, description="Calculated threat severity score (0 to 100).")
     label: str = Field(..., description="Safety tier classification: SAFE, SUSPICIOUS, or MALICIOUS.")
     reason: ReasonDetail = Field(..., description="Detailed split non-technical and technical reasons.")
+    action: str = Field(None, description="Recommended runtime response action: ALLOW, SANITIZE, or BLOCK.")
+    processed_output: str = Field(None, description="Processed prompt payload after safety screening.")
 
 # System prompt for LLM security classification
 SYSTEM_PROMPT = (
@@ -143,17 +145,45 @@ def detection_agent(prompt: str) -> dict:
             }
         }
 
+def response_agent(result: dict, prompt: str) -> dict:
+    import re
+    label = result.get("label", "SAFE").upper()
+    
+    if label == "SAFE":
+        action = "ALLOW"
+        processed_output = prompt
+    elif label == "SUSPICIOUS":
+        action = "SANITIZE"
+        # Mask standard US phone numbers: e.g. 555-0199 or standard credit cards
+        sanitized = re.sub(r'\b\d{3}-\d{4}\b', '[REDACTED_PHONE]', prompt)
+        sanitized = re.sub(r'\b\d{3}-\d{3}-\d{4}\b', '[REDACTED_PHONE]', sanitized)
+        sanitized = re.sub(r'\b\d{4}-\d{4}-\d{4}-\d{4}\b', '[REDACTED_CARD]', sanitized)
+        processed_output = sanitized
+    else: # MALICIOUS
+        action = "BLOCK"
+        processed_output = "[BLOCKED BY POLICY]"
+
+    return {
+        "action": action,
+        "processed_output": processed_output
+    }
+
 @app.post("/analyze", response_model=AnalyzeResponse)
 async def analyze_prompt(request: AnalyzeRequest):
     logger.info(f"Incoming prompt scanner request: {repr(request.prompt)}")
     result = detection_agent(request.prompt)
+    response_data = response_agent(result, request.prompt)
+    logger.info(f"RESPONSE AGENT → action: {response_data['action']}")
+    
     return AnalyzeResponse(
         risk=result["risk"],
         label=result["label"],
         reason=ReasonDetail(
             simple=result["reason"]["simple"],
             technical=result["reason"]["technical"]
-        )
+        ),
+        action=response_data["action"],
+        processed_output=response_data["processed_output"]
     )
 
 
