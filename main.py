@@ -36,7 +36,10 @@ if not api_key:
     logger.warning("⚠️ OPENAI_API_KEY not found in environment. Backend will operate in mock-safety fallback mode.")
     client = None
 else:
-    client = OpenAI(api_key=api_key)
+    client = OpenAI(
+        api_key=api_key,
+        base_url="https://openrouter.ai/api/v1"
+    )
 
 # Request Schema
 class AnalyzeRequest(BaseModel):
@@ -80,7 +83,7 @@ async def analyze_prompt(request: AnalyzeRequest):
     try:
         # Request completion from OpenAI with JSON structured output format forced
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="openai/gpt-4o-mini",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": request.prompt}
@@ -167,5 +170,5 @@ def health_check():
     return {
         "status": "ok",
         "online": True,
-        "model": "gpt-4o-mini" if client else "local-fallback"
+        "model": "openai/gpt-4o-mini" if client else "local-fallback"
     }
