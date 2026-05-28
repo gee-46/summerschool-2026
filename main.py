@@ -129,7 +129,7 @@ def get_mock_fallback(prompt: str) -> AnalyzeResponse:
     lower = prompt.lower()
     
     # 1. Malicious triggers
-    if any(k in lower for k in ["ignore instruction", "ignore instructions", "bypass", "sudo", "/etc/shadow", "evil-endpoint", "rm -rf"]):
+    if any(k in lower for k in ["ignore", "bypass", "sudo", "/etc/shadow", "evil-endpoint", "rm -rf"]):
         return AnalyzeResponse(
             risk=98,
             label="MALICIOUS",
