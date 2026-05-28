@@ -253,3 +253,17 @@ def health_check():
         "online": True,
         "model": "openai/gpt-4o-mini" if client else "local-fallback"
     }
+
+
+@app.get("/", response_class=HTMLResponse)
+def serve_frontend():
+    """Serves the interactive frontend dashboard at the root endpoint."""
+    from fastapi.responses import HTMLResponse
+    try:
+        with open("index.html", "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read(), status_code=200)
+    except Exception as e:
+        return HTMLResponse(
+            content=f"<h1>SentinelRL Security Enclave</h1><p>Frontend load exception: {str(e)}</p>",
+            status_code=500
+        )
