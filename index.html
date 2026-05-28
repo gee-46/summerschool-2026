@@ -980,11 +980,11 @@
       document.getElementById('agentOutputConsole').innerText = "> Analyzing input payload in sandboxed gateway...";
       
       writeLog("> INITIATING REAL-TIME API CLASSIFICATION SCAN...");
-      writeLog("> Dispatching POST request to http://localhost:8000/analyze...");
+      writeLog("> Dispatching POST request to https://summerschool-2026.onrender.com/analyze...");
 
       try {
-        // Attempt to contact local FastAPI SentinelRL Server
-        const response = await fetch("http://localhost:8000/analyze", {
+        // Attempt to contact live production Render FastAPI Server
+        const response = await fetch("https://summerschool-2026.onrender.com/analyze", {
           method: "POST",
           headers: {
             "Content-Type": "application/json"
@@ -1018,7 +1018,7 @@
               p3: label === "SAFE" ? 'PASS' : label === "SUSPICIOUS" ? 'WARN' : 'FAIL'
             },
             logs: [
-              "INGRESS GATEWAY -> Established bridge to FastAPI server at port 8000.",
+              "INGRESS GATEWAY -> Established bridge to FastAPI server at summerschool-2026.onrender.com.",
               "CLASSIFICATION ENGINE -> GPT-4o-Mini model inference completed.",
               `SECURITY METRIC -> Risk Score: ${apiResult.risk} | Class: ${apiResult.label}`,
               `EXPLANATION -> "${apiResult.reason.simple}"`,
@@ -1030,14 +1030,14 @@
         }
       } catch (err) {
         // Log clean error tracking to browser logs
-        console.warn("FastAPI server offline on port 8000. Fallback heuristics activated.");
+        console.warn("FastAPI server offline on Render. Fallback heuristics activated.");
       }
 
       // 2. Handle errors gracefully: fallback message if API fails
-      writeLog("> ERROR: Failed to connect to SentinelRL API at http://localhost:8000.");
+      writeLog("> ERROR: Failed to connect to SentinelRL API at https://summerschool-2026.onrender.com.");
       writeLog("> WARNING: Offline fallback heuristic scanner active.");
       
-      document.getElementById('explanationSimple').innerText = "⚠️ Failed to reach the SentinelRL API on localhost:8000.";
+      document.getElementById('explanationSimple').innerText = "⚠️ Failed to reach the SentinelRL API on Render.";
       document.getElementById('explanationTechnical').innerText = "API offline. Local offline heuristics resolved this request's threat profile.";
 
       // Standalone Fallback Scan (Runs when backend server is offline)
