@@ -72,13 +72,20 @@ SYSTEM_PROMPT = (
     "Ensure 'label' is strictly one of: SAFE, SUSPICIOUS, or MALICIOUS."
 )
 
-@app.post("/analyze", response_model=AnalyzeResponse)
-async def analyze_prompt(request: AnalyzeRequest):
-    logger.info(f"Incoming prompt scanner request: {repr(request.prompt)}")
-
+def detection_agent(prompt: str) -> dict:
+    logger.info("DETECTION AGENT → scanning input")
+    
     # Hackathon Fail-Safe Fallback Matrix (If OpenAI key is missing or quota is exhausted)
     if not client:
-        return get_mock_fallback(request.prompt)
+        fallback = get_mock_fallback(prompt)
+        return {
+            "risk": fallback.risk,
+            "label": fallback.label,
+            "reason": {
+                "simple": fallback.reason.simple,
+                "technical": fallback.reason.technical
+            }
+        }
 
     try:
         # Request completion from OpenAI with JSON structured output format forced
@@ -86,7 +93,7 @@ async def analyze_prompt(request: AnalyzeRequest):
             model="openai/gpt-4o-mini",
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": request.prompt}
+                {"role": "user", "content": prompt}
             ],
             response_format={"type": "json_object"},
             temperature=0.0,  # Deterministic analysis
@@ -97,8 +104,6 @@ async def analyze_prompt(request: AnalyzeRequest):
         logger.info(f"OpenAI raw response: {raw_content}")
         
         parsed_json = json.loads(raw_content)
-        
-        # Coerce output values
         risk = int(parsed_json.get("risk", 0))
         label = str(parsed_json.get("label", "SAFE")).upper()
         
@@ -110,21 +115,46 @@ async def analyze_prompt(request: AnalyzeRequest):
         else:
             reason_simple = str(reason_data.get("simple", "Threat scanner active."))
             reason_technical = str(reason_data.get("technical", "Manual security rules matched input pattern."))
-
-        reason = ReasonDetail(simple=reason_simple, technical=reason_technical)
-        
+            
         # Ensure label matches the allowed categories
         if label not in ["SAFE", "SUSPICIOUS", "MALICIOUS"]:
             label = "SUSPICIOUS" if risk > 30 else "SAFE"
             if risk > 75:
                 label = "MALICIOUS"
-
-        return AnalyzeResponse(risk=risk, label=label, reason=reason)
+                
+        return {
+            "risk": risk,
+            "label": label,
+            "reason": {
+                "simple": reason_simple,
+                "technical": reason_technical
+            }
+        }
 
     except Exception as e:
         logger.error(f"OpenAI classification error: {str(e)}. Falling back to local match matrix.")
-        # Seamlessly fallback to mock data to keep the live hackathon pitch running
-        return get_mock_fallback(request.prompt)
+        fallback = get_mock_fallback(prompt)
+        return {
+            "risk": fallback.risk,
+            "label": fallback.label,
+            "reason": {
+                "simple": fallback.reason.simple,
+                "technical": fallback.reason.technical
+            }
+        }
+
+@app.post("/analyze", response_model=AnalyzeResponse)
+async def analyze_prompt(request: AnalyzeRequest):
+    logger.info(f"Incoming prompt scanner request: {repr(request.prompt)}")
+    result = detection_agent(request.prompt)
+    return AnalyzeResponse(
+        risk=result["risk"],
+        label=result["label"],
+        reason=ReasonDetail(
+            simple=result["reason"]["simple"],
+            technical=result["reason"]["technical"]
+        )
+    )
 
 
 def get_mock_fallback(prompt: str) -> AnalyzeResponse:
