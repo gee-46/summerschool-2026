@@ -1302,46 +1302,54 @@
       document.getElementById('agentOutputConsole').textContent = '> Connecting to remote secure enclave gateway...';
       writeLog('INGRESS', 'Dispatched classification query to SentinelRL backend.', 't-info');
 
-      try {
-        const res = await fetch('http://localhost:8000/analyze', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: input })
-        });
+      const apiEndpoints = [
+        'https://summerschool-2026.onrender.com/analyze',
+        'http://localhost:8000/analyze'
+      ];
 
-        if (res.ok) {
-          const apiData = await res.json();
-          const label = apiData.label.toUpperCase();
+      for (let url of apiEndpoints) {
+        try {
+          writeLog('ENCLAVE', `Attempting connection to ${url.includes('onrender') ? 'Render production' : 'localhost'} backend...`, 't-info');
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: input })
+          });
 
-          const parsedData = {
-            prompt: input,
-            riskScore: apiData.risk,
-            explanation: {
-              simple: apiData.reason.simple,
-              technical: apiData.reason.technical
-            },
-            agentOutput: apiData.processed_output === '[BLOCKED BY POLICY]'
-              ? `⚠️ SECURITY POLICY FAULT:\nSentinelRL intercepted sandbox breach. Session dropped.\nError Code: AI-EXFIL-API\nDiagnostics: ${apiData.reason.simple}`
-              : apiData.processed_output !== input
-                ? `💬 REDACTED PAYLOAD:\nAction permitted under sanitized constraints.\nOutput: "${apiData.processed_output}"`
-                : `📅 AGENT RESPONSE:\nProcess completed safely.\nReason: ${apiData.reason.simple}`,
-            policies: {
-              p1: label === 'SAFE' ? 'PASS' : label === 'SUSPICIOUS' ? 'WARN' : 'FAIL',
-              p2: label === 'SAFE' ? 'PASS' : label === 'SUSPICIOUS' ? 'PASS' : 'FAIL',
-              p3: label === 'SAFE' ? 'PASS' : label === 'SUSPICIOUS' ? 'WARN' : 'FAIL'
-            },
-            logs: [
-              `ENCLAVE — Connected to backend API gateway on http://localhost:8000.`,
-              `ANALYSIS — Risk assessment computed: ${apiData.risk} (${label})`,
-              `DECISION — Response agent instructed action: ${apiData.action}`,
-              `TRACE — API Pipeline status logs: ${apiData.trace.join(' → ')}`
-            ]
-          };
-          runScenarioFlow(parsedData, label);
-          return;
+          if (res.ok) {
+            const apiData = await res.json();
+            const label = apiData.label.toUpperCase();
+
+            const parsedData = {
+              prompt: input,
+              riskScore: apiData.risk,
+              explanation: {
+                simple: apiData.reason.simple,
+                technical: apiData.reason.technical
+              },
+              agentOutput: apiData.processed_output === '[BLOCKED BY POLICY]'
+                ? `⚠️ SECURITY POLICY FAULT:\nSentinelRL intercepted sandbox breach. Session dropped.\nError Code: AI-EXFIL-API\nDiagnostics: ${apiData.reason.simple}`
+                : apiData.processed_output !== input
+                  ? `💬 REDACTED PAYLOAD:\nAction permitted under sanitized constraints.\nOutput: "${apiData.processed_output}"`
+                  : `📅 AGENT RESPONSE:\nProcess completed safely.\nReason: ${apiData.reason.simple}`,
+              policies: {
+                p1: label === 'SAFE' ? 'PASS' : label === 'SUSPICIOUS' ? 'WARN' : 'FAIL',
+                p2: label === 'SAFE' ? 'PASS' : label === 'SUSPICIOUS' ? 'PASS' : 'FAIL',
+                p3: label === 'SAFE' ? 'PASS' : label === 'SUSPICIOUS' ? 'WARN' : 'FAIL'
+              },
+              logs: [
+                `ENCLAVE — Connected successfully to ${url.includes('onrender') ? 'Render' : 'Local'} API gateway.`,
+                `ANALYSIS — Risk assessment computed: ${apiData.risk} (${label})`,
+                `DECISION — Response agent instructed action: ${apiData.action}`,
+                `TRACE — API Pipeline status logs: ${apiData.trace.join(' → ')}`
+              ]
+            };
+            runScenarioFlow(parsedData, label);
+            return;
+          }
+        } catch(e) {
+          console.warn(`Connection failed for endpoint: ${url}`);
         }
-      } catch(e) {
-        console.warn("FastAPI offline. Deploying local heuristic scanner.");
       }
 
       // Offline Fallback local classification
