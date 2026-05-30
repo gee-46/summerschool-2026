@@ -1,4 +1,4 @@
-
+<div align="center">
 
 # 🛡️ SentinelRL
 ### *Real-Time Security Firewall for Autonomous AI Agents*
